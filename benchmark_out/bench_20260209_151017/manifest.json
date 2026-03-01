@@ -1,0 +1,27 @@
+{
+  "run_name": "bench_20260209_151017",
+  "seed": 7,
+  "model": "gemma-3-27b-it",
+  "n_people": 10,
+  "facts_per_person": 20,
+  "n_eval_question_paraphrases": 10,
+  "total_training_qa": 200,
+  "total_eval_paraphrases": 200,
+  "unlearning_type": "intra_entity",
+  "forget_field": "negative_incident",
+  "sf_size": 10,
+  "sr_size": 190,
+  "freeform_eval_prompts": 30,
+  "files": {
+    "people_profiles": "people_with_facts.jsonl",
+    "training_qa": "training_qa.jsonl",
+    "eval_paraphrases": "eval_paraphrases.jsonl",
+    "freeform_eval": "freeform_eval.jsonl",
+    "sf": "sf.jsonl",
+    "sr": "sr.jsonl",
+    "sf_ids": "sf_ids.txt",
+    "sr_ids": "sr_ids.txt",
+    "wrong_details": "wrong_details.jsonl",
+    "manifest": "manifest.json"
+  }
+}
