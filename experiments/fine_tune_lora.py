@@ -1,12 +1,3 @@
-"""Fine-tune Qwen2.5-1.5B-Instruct on ALL QA pairs (sf + sr) using LoRA.
-
-sf.jsonl = 7 "forget" facts (negative_incident)
-sr.jsonl = 133 "retain" facts (all other biographical fields)
-
-Combined: 140 examples → model learns all facts perfectly.
-Output: ./models/finetuned_adapter/
-"""
-
 import json
 import torch
 from datasets import Dataset
@@ -15,9 +6,7 @@ from peft import LoraConfig
 from trl import SFTTrainer, SFTConfig
 
 
-# ======================
-# 1. Load Data
-# ======================
+
 def load_jsonl(path):
     data = []
     with open(path, "r", encoding="utf-8") as f:
@@ -28,11 +17,11 @@ def load_jsonl(path):
     return data
 
 
-sf_data = load_jsonl("./data/sf.jsonl")   # 7 forget facts
-sr_data = load_jsonl("./data/sr.jsonl")   # 133 retain facts
-all_data = sf_data + sr_data              # 140 total
+sf_data = load_jsonl("../data/sf.jsonl")  
+sr_data = load_jsonl("../data/sr.jsonl")   
+all_data = sf_data + sr_data              
 
-# Format as chat messages — TRL applies Qwen's chat template automatically
+# Format as chat messages 
 dataset = Dataset.from_list([
     {
         "messages": [
@@ -43,14 +32,9 @@ dataset = Dataset.from_list([
     for item in all_data
 ])
 
-print(f"Training examples: {len(dataset)}  (sf={len(sf_data)}, sr={len(sr_data)})")
 
-
-# ======================
-# 2. Configuration
-# ======================
 MODEL_NAME = "Qwen/Qwen2.5-1.5B-Instruct"
-OUTPUT_DIR = "./models/finetuned_adapter"
+OUTPUT_DIR = "../models/finetuned_adapter"
 
 lora_config = LoraConfig(
     r=16,
@@ -77,9 +61,6 @@ sft_config = SFTConfig(
 )
 
 
-# ======================
-# 3. Model & Tokenizer
-# ======================
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 tokenizer.pad_token = tokenizer.eos_token
 
@@ -90,9 +71,7 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 
 
-# ======================
-# 4. Training
-# ======================
+# train
 trainer = SFTTrainer(
     model=model,
     train_dataset=dataset,
@@ -103,4 +82,4 @@ trainer = SFTTrainer(
 
 trainer.train()
 trainer.save_model(OUTPUT_DIR)
-print(f"Done. Adapter saved to {OUTPUT_DIR}")
+print(f"Adapter saved to {OUTPUT_DIR}")

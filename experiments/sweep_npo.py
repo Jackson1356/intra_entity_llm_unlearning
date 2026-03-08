@@ -1,30 +1,6 @@
-"""Hyperparameter sweep for Negative Preference Optimization (NPO) unlearning.
-
-NPO loss: L = -2/beta * E[ log sigma( -beta * (log_p_theta - log_p_ref) ) ]
-
-Three ablations:
-  Beta ablation    (LR=1e-5, ep=5): beta in {0.05, 0.1*, 0.5, 1.0}
-  LR ablation      (beta=0.1, ep=5): LR in {1e-5*, 5e-5, 1e-4}
-  Epoch ablation   (beta=0.1, LR=1e-5): ep in {5*, 10, 20}
-  (* = existing ./models/unlearn_npo, skipped automatically)
-
-Models saved to ./models/unlearn_npo_{tag}/
-
-Usage:
-    python sweep_npo.py            # run all missing configs
-    python sweep_npo.py --dry-run  # print plan without training
-"""
-
-import argparse
 import json
 import os
 import sys
-
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8")
-
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset as TorchDataset
@@ -32,41 +8,20 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 
 
-# ──────────────────────────────────────────────
-# Constants
-# ──────────────────────────────────────────────
+
 BASE_MODEL        = "Qwen/Qwen2.5-1.5B-Instruct"
-FINETUNED_ADAPTER = "./models/finetuned_adapter"
-SF_PATH           = "./data/sf.jsonl"
+FINETUNED_ADAPTER = "../models/finetuned_adapter"
+SF_PATH           = "../data/sf.jsonl"
 MAX_LENGTH        = 256
 BATCH_SIZE        = 2
 GRAD_ACCUM        = 2
-
-# ──────────────────────────────────────────────
-# Sweep grid: (beta, lr, epochs, tag)
-# ──────────────────────────────────────────────
-# Base (beta=0.1, lr=1e-5, ep=5) already trained -> ./models/unlearn_npo
-BASELINE_TAG = "beta0.1_lr1e5_ep5"
-BASELINE_DIR = "./models/unlearn_npo"
-
 SWEEP = [
-    # ── Beta ablation (LR=1e-5, ep=5) ─────────────────────────
-    (0.05, 1e-5, 5,  "beta0.05_lr1e5_ep5"),
-    (0.1,  1e-5, 5,  BASELINE_TAG),          # <- baseline, skip
-    (0.5,  1e-5, 5,  "beta0.5_lr1e5_ep5"),
-    (1.0,  1e-5, 5,  "beta1.0_lr1e5_ep5"),
-    # ── LR ablation (beta=0.1, ep=5) ──────────────────────────
-    (0.1,  5e-5, 5,  "beta0.1_lr5e5_ep5"),
-    (0.1,  1e-4, 5,  "beta0.1_lr1e4_ep5"),
-    # ── Epoch ablation (beta=0.1, LR=1e-5) ────────────────────
+    (0.1,  1e-5, 5, "beta0.1_lr1e5_ep5"),
     (0.1,  1e-5, 10, "beta0.1_lr1e5_ep10"),
+    (0.1,  1e-5, 15, "beta0.1_lr1e5_ep15"),
     (0.1,  1e-5, 20, "beta0.1_lr1e5_ep20"),
 ]
 
-
-# ──────────────────────────────────────────────
-# Data helpers
-# ──────────────────────────────────────────────
 def load_jsonl(path):
     with open(path, "r", encoding="utf-8") as f:
         return [json.loads(l) for l in f if l.strip()]
@@ -112,10 +67,6 @@ def collate_fn(batch):
             "attention_mask": torch.stack(masks),
             "labels": torch.stack(lbls)}
 
-
-# ──────────────────────────────────────────────
-# Log-probability helper
-# ──────────────────────────────────────────────
 def batch_avg_logprob(model, input_ids, attention_mask, labels):
     """Average per-token log-probability over completion tokens."""
     outputs = model(input_ids=input_ids, attention_mask=attention_mask)
@@ -130,9 +81,6 @@ def batch_avg_logprob(model, input_ids, attention_mask, labels):
     return avg_lp
 
 
-# ──────────────────────────────────────────────
-# NPO training with configurable beta
-# ──────────────────────────────────────────────
 def run_npo(model, ref_model, forget_loader, device,
             output_dir, lr, num_epochs, beta):
     optimizer = torch.optim.AdamW(
@@ -174,28 +122,13 @@ def run_npo(model, ref_model, forget_loader, device,
 
     os.makedirs(output_dir, exist_ok=True)
     model.save_pretrained(output_dir)
-    print(f"  Saved -> {output_dir}")
+    print(f"  saved  {output_dir}")
 
 
-# ──────────────────────────────────────────────
-# Main
-# ──────────────────────────────────────────────
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--dry-run", action="store_true")
-    args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Device: {device}")
-
-    if args.dry_run:
-        print("\nSweep plan:")
-        for beta, lr, ep, tag in SWEEP:
-            out = BASELINE_DIR if tag == BASELINE_TAG else f"./models/unlearn_npo_{tag}"
-            exists = os.path.isdir(out)
-            print(f"  beta={beta}  lr={lr:.0e}  ep={ep:2d}  "
-                  f"tag={tag:<25}  [{'EXISTS (skip)' if exists else 'WILL TRAIN'}]")
-        return
 
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
     tokenizer.pad_token = tokenizer.eos_token
@@ -206,12 +139,7 @@ def main():
                                collate_fn=collate_fn)
 
     for beta, lr, num_epochs, tag in SWEEP:
-        out_dir = BASELINE_DIR if tag == BASELINE_TAG else f"./models/unlearn_npo_{tag}"
-
-        print(f"\n{'='*60}")
-        print(f"Config: beta={beta}  lr={lr:.0e}  ep={num_epochs}  -> {out_dir}")
-        print(f"{'='*60}")
-
+        out_dir = f"../models/unlearn_npo_{tag}"
         if os.path.isdir(out_dir):
             print(f"  [SKIP] Already exists.")
             continue
@@ -235,7 +163,7 @@ def main():
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    print("\nNPO sweep complete. Run eval_sweep.py to evaluate all configs.")
+    print(" NPO sweep complete. ")
 
 
 if __name__ == "__main__":

@@ -1,11 +1,3 @@
-"""Fine-tune Qwen2.5-1.5B-Instruct on RETAIN set only (sr.jsonl) using LoRA.
-
-This model never sees the forget facts (sf.jsonl) and serves as the
-gold-standard reference for evaluating unlearning quality.
-
-Output: ./models/retain_only_adapter/
-"""
-
 import json
 import torch
 from datasets import Dataset
@@ -14,9 +6,6 @@ from peft import LoraConfig
 from trl import SFTTrainer, SFTConfig
 
 
-# ======================
-# 1. Load Retain Data Only
-# ======================
 def load_jsonl(path):
     data = []
     with open(path, "r", encoding="utf-8") as f:
@@ -27,7 +16,7 @@ def load_jsonl(path):
     return data
 
 
-sr_data = load_jsonl("./data/sr.jsonl")   # 133 retain facts only
+sr_data = load_jsonl("../data/sr.jsonl") 
 
 dataset = Dataset.from_list([
     {
@@ -42,11 +31,9 @@ dataset = Dataset.from_list([
 print(f"Training examples: {len(dataset)}  (retain only, no forget facts)")
 
 
-# ======================
-# 2. Configuration
-# ======================
+
 MODEL_NAME = "Qwen/Qwen2.5-1.5B-Instruct"
-OUTPUT_DIR = "./models/retain_only_adapter"
+OUTPUT_DIR = "../models/retain_only_adapter"
 
 lora_config = LoraConfig(
     r=16,
@@ -64,7 +51,7 @@ sft_config = SFTConfig(
     per_device_train_batch_size=4,
     gradient_accumulation_steps=4,
     learning_rate=2e-4,
-    num_train_epochs=30,
+    num_train_epochs=20,
     bf16=True,
     save_strategy="epoch",
     logging_steps=10,
@@ -73,9 +60,6 @@ sft_config = SFTConfig(
 )
 
 
-# ======================
-# 3. Model & Tokenizer
-# ======================
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 tokenizer.pad_token = tokenizer.eos_token
 
@@ -86,9 +70,6 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 
 
-# ======================
-# 4. Training
-# ======================
 trainer = SFTTrainer(
     model=model,
     train_dataset=dataset,

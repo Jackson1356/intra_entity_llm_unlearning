@@ -1,31 +1,7 @@
-"""Hyperparameter sweep for Gradient Difference (GD) unlearning.
-
-GD loss: L = -CE(forget) + lambda * CE(retain)
-
-Three ablations:
-  Lambda ablation  (LR=1e-5, ep=5): lambda in {0.5, 1.0*, 2.0, 5.0}
-  LR ablation      (lam=1.0, ep=5): LR    in {1e-5*, 5e-5, 1e-4}
-  Epoch ablation   (lam=1.0, LR=1e-5): ep in {5*, 10, 20}
-  (* = existing ./models/unlearn_gd, skipped automatically)
-
-Models saved to ./models/unlearn_gd_{tag}/
-
-Usage:
-    python sweep_gd.py            # run all missing configs
-    python sweep_gd.py --dry-run  # print plan without training
-"""
-
-import argparse
 import json
 import math
 import os
 import sys
-
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8")
-
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset as TorchDataset
@@ -33,42 +9,22 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 
 
-# ──────────────────────────────────────────────
-# Constants
-# ──────────────────────────────────────────────
+
 BASE_MODEL        = "Qwen/Qwen2.5-1.5B-Instruct"
-FINETUNED_ADAPTER = "./models/finetuned_adapter"
-SF_PATH           = "./data/sf.jsonl"
-SR_PATH           = "./data/sr.jsonl"
+FINETUNED_ADAPTER = "../models/finetuned_adapter"
+SF_PATH           = "../data/sf.jsonl"
+SR_PATH           = "../data/sr.jsonl"
 MAX_LENGTH        = 256
 BATCH_SIZE        = 2
 GRAD_ACCUM        = 2
 
-# ──────────────────────────────────────────────
-# Sweep grid: (retain_lambda, lr, epochs, tag)
-# ──────────────────────────────────────────────
-# Base (lambda=1.0, lr=1e-5, ep=5) already trained -> ./models/unlearn_gd
-BASELINE_TAG = "lam1.0_lr1e5_ep5"
-BASELINE_DIR = "./models/unlearn_gd"
-
 SWEEP = [
-    # ── Lambda ablation (LR=1e-5, ep=5) ───────────────────────
-    (0.5, 1e-5, 5,  "lam0.5_lr1e5_ep5"),
-    (1.0, 1e-5, 5,  BASELINE_TAG),          # <- baseline, skip
-    (2.0, 1e-5, 5,  "lam2.0_lr1e5_ep5"),
-    (5.0, 1e-5, 5,  "lam5.0_lr1e5_ep5"),
-    # ── LR ablation (lambda=1.0, ep=5) ────────────────────────
-    (1.0, 5e-5, 5,  "lam1.0_lr5e5_ep5"),
-    (1.0, 1e-4, 5,  "lam1.0_lr1e4_ep5"),
-    # ── Epoch ablation (lambda=1.0, LR=1e-5) ──────────────────
+    (1.0, 1e-5, 5, "lam1.0_lr1e5_ep5"),
     (1.0, 1e-5, 10, "lam1.0_lr1e5_ep10"),
+    (1.0, 1e-5, 15, "lam1.0_lr1e5_ep15"),
     (1.0, 1e-5, 20, "lam1.0_lr1e5_ep20"),
 ]
 
-
-# ──────────────────────────────────────────────
-# Data helpers
-# ──────────────────────────────────────────────
 def load_jsonl(path):
     with open(path, "r", encoding="utf-8") as f:
         return [json.loads(l) for l in f if l.strip()]
@@ -115,9 +71,6 @@ def collate_fn(batch):
             "labels": torch.stack(lbls)}
 
 
-# ──────────────────────────────────────────────
-# GD training with configurable lambda
-# ──────────────────────────────────────────────
 def run_gradient_difference(model, forget_loader, retain_loader,
                              device, output_dir, lr, num_epochs, retain_lambda):
     optimizer = torch.optim.AdamW(
@@ -167,29 +120,12 @@ def run_gradient_difference(model, forget_loader, retain_loader,
 
     os.makedirs(output_dir, exist_ok=True)
     model.save_pretrained(output_dir)
-    print(f"  Saved -> {output_dir}")
+    print(f" saved {output_dir}")
 
 
-# ──────────────────────────────────────────────
-# Main
-# ──────────────────────────────────────────────
+
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--dry-run", action="store_true")
-    args = parser.parse_args()
-
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Device: {device}")
-
-    if args.dry_run:
-        print("\nSweep plan:")
-        for lam, lr, ep, tag in SWEEP:
-            out = BASELINE_DIR if tag == BASELINE_TAG else f"./models/unlearn_gd_{tag}"
-            exists = os.path.isdir(out)
-            print(f"  lam={lam}  lr={lr:.0e}  ep={ep:2d}  "
-                  f"tag={tag:<25}  [{'EXISTS (skip)' if exists else 'WILL TRAIN'}]")
-        return
-
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
     tokenizer.pad_token = tokenizer.eos_token
 
@@ -201,14 +137,9 @@ def main():
                                batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_fn)
 
     for lam, lr, num_epochs, tag in SWEEP:
-        out_dir = BASELINE_DIR if tag == BASELINE_TAG else f"./models/unlearn_gd_{tag}"
-
-        print(f"\n{'='*60}")
-        print(f"Config: lam={lam}  lr={lr:.0e}  ep={num_epochs}  -> {out_dir}")
-        print(f"{'='*60}")
-
+        out_dir = f"../models/unlearn_gd_{tag}"
         if os.path.isdir(out_dir):
-            print(f"  [SKIP] Already exists.")
+            print(f"Already exists.")
             continue
 
         base  = AutoModelForCausalLM.from_pretrained(
@@ -221,7 +152,7 @@ def main():
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    print("\nGD sweep complete. Run eval_sweep.py to evaluate all configs.")
+    print("GD sweep complete.")
 
 
 if __name__ == "__main__":
