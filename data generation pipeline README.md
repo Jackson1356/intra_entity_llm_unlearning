@@ -12,9 +12,8 @@
 |--------|------|----------------|
 | **Unlearning granularity** | Forgets entire *authors* (inter-entity) | Forgets one *fact* per person (intra-entity): the `negative_incident` |
 | **Forget set** | Subset of authors (e.g. PF=20 people); all their facts | **Every** person; only the negative_incident QA per person (SF) |
-| **Fact structure** | Flat facts per author | **Entangled**: dependency chain (`breakthrough_year_event` cites incident anchor), false friend (`philanthropy_focus` shares entity), anchor ambiguity (near-duplicate anchors) |
+| **Fact structure** | Flat facts per author | **Entangled**: dependency chain (`breakthrough_year_event` cites incident anchor) |
 | **Training data** | 1 QA per fact | Same: 1 QA per fact |
-| **Eval paraphrases** | Paraphrased Qs for Truth Ratio | Same idea; plus **Part 4** builds forget-set–specific paraphrased answers and **close distractors** (same style, different facts) for Truth Ratio and forget quality |
 
 ---
 
@@ -29,18 +28,10 @@ profiles.jsonl   people_with_facts   training_qa, sf, sr    sf_forget_eval.jsonl
 ```
 
 - **Part 1:** Fictitious profiles (diverse names, regions, roles). Resume-capable.
-- **Part 2:** 20 facts/person; batch generation for 17 independent facts (~6–7× fewer calls); skips hard people; resume from last person ID + 1.
+- **Part 2:** 20 facts/person; batch generation for 17 independent facts; skips hard people; resume from last person ID + 1.
 - **Part 3:** 1 training QA per fact; forget/retain split (SF = negative_incident for every person, SR = rest); eval paraphrased questions per fact.
 - **Part 4:** Runs only on `sf.jsonl`. For each SF QA: one paraphrased answer + 5 wrong answers (same template, different facts) for Truth Ratio and forget-quality metrics.
 
----
-
-## Setup
-
-```bash
-export GEMINI_API_KEY="your_key"   # or $env:GEMINI_API_KEY on Windows
-pip install google-generativeai
-```
 
 ---
 
@@ -110,5 +101,3 @@ python part2_generate_facts.py
 python part3_generate_qa.py
 python part4_generate_forget_eval.py
 ```
-
-Config and defaults: see `TARGET_SUCCESSFUL_PEOPLE`, `N_EVAL_QUESTION_PARAPHRASES`, `RPM_LIMIT`, `N_WRONG_ANSWERS` in the scripts. Part 2 logs failures to `part2_failures.log` and skips difficult people.
