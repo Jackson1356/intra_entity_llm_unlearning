@@ -1,12 +1,3 @@
-"""
-Part 1: Generate Profiles for 200 Fictitious People
-
-This script generates only the basic biographical profiles (name, age, role, bio, etc.)
-for 200 fictitious people. This is fast and serves as the foundation for Part 2.
-
-Output: profiles.jsonl (one profile per line)
-"""
-
 import os, json, time, pathlib, random
 from typing import Dict, Any, List
 from datetime import datetime

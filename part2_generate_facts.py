@@ -1,17 +1,3 @@
-"""
-Part 2: Generate 20 Facts per Person (THE BOTTLENECK)
-
-This script takes the profiles from Part 1 and generates 20 entangled facts per person.
-This is the most complex and error-prone part, so we:
-- Save progress after EVERY person
-- Support full resume capability
-- Manage token limits carefully
-- Validate fact relationships (dependency chains, false friends, ambiguity)
-
-Input: profiles.jsonl from Part 1
-Output: people_with_facts.jsonl (one person per line, with all 20 facts)
-"""
-
 import os, re, json, random, time, pathlib
 from typing import Dict, List, Any, Tuple, Optional
 from datetime import datetime
@@ -71,7 +57,6 @@ FORGET_FIELD = "negative_incident"
 DEPENDENCY_FIELD = "breakthrough_year_event"
 DISTRACTOR_FIELD = "philanthropy_focus"
 
-# Fields (20 total)
 FIELDS = [
     "birthplace_city_country",
     "current_base_city_country",
@@ -97,16 +82,13 @@ FIELDS = [
 assert len(FIELDS) == 20
 FORGET_FACT_ID = FIELDS.index(FORGET_FIELD) + 1
 
-# Batch generation: Split into independent and entangled fields
 ENTANGLED_FIELDS = {FORGET_FIELD, DEPENDENCY_FIELD, DISTRACTOR_FIELD}
 INDEPENDENT_FIELDS = [f for f in FIELDS if f not in ENTANGLED_FIELDS]
 assert len(INDEPENDENT_FIELDS) == 17
 assert len(ENTANGLED_FIELDS) == 3
 
-# Anchor tiers
 TIER_COUNTS = {"direct": 4, "descriptive": 10, "opaque": 6}
 
-# Ambiguity settings
 ANCHOR_AMBIGUITY_PROB = 0.35
 ANCHOR_AMBIGUITY_MAX_PAIRS = 2
 ANCHOR_AMBIGUITY_SUFFIXES = [
@@ -114,31 +96,22 @@ ANCHOR_AMBIGUITY_SUFFIXES = [
 ]
 AMBIGUITY_EXCLUDE_FIELDS = {FORGET_FIELD, DEPENDENCY_FIELD, DISTRACTOR_FIELD}
 
-# Generation params
-TEMP_GEN = 0.95  # Increased from 0.85 to 0.95 for more diversity
+TEMP_GEN = 0.95
 TEMP_RED = 0.2
 TOP_P = 0.95
 MAX_TOKENS_FIELD = 650
 MAX_TOKENS_FACTTEXT = 500
 MAX_TOKENS_REDTEAM = 900
 
-# Retries (balanced for speed vs resilience)
-MAX_FIELD_TRIES = 12  # Reduced from 20 to 12 (faster, still robust with V3 fixes)
-MAX_FACTTEXT_TRIES = 3  # Back to 3 (fact_text is usually fine)
-MAX_PERSON_TRIES = 6   # Reduced from 12 to 6 (fail faster, continue to next)
-MAX_REDTEAM_CYCLES = 2 # Reduced from 3 to 2 (speed up)
+MAX_FIELD_TRIES = 12
+MAX_FACTTEXT_TRIES = 3
+MAX_PERSON_TRIES = 6
+MAX_REDTEAM_CYCLES = 2
 
-# Target number of successful people (will skip difficult SSones)
 TARGET_SUCCESSFUL_PEOPLE = 20  
 
-# CRITICAL: Limit context window to avoid token overflow
-MAX_CONTEXT_HISTORY = 200  # Only keep last 200 anchors/details in prompts
+MAX_CONTEXT_HISTORY = 200
 
-
-# =========================================================
-# REGEX + HELPERS (Relaxed for multilingual names)
-# =========================================================
-# Allow international characters (á, é, ñ, etc.) in anchors
 ANCHOR_DIRECT_RE = re.compile(r"^[A-ZÀ-ÿ][A-Za-zÀ-ÿ ]{3,32}$", re.UNICODE)
 ANCHOR_TITLECASE_RE = re.compile(r"^[A-ZÀ-ÿ][a-zà-ÿ]+(?: [A-ZÀ-ÿ][a-zà-ÿ]+){1,3}$", re.UNICODE)
 PROPER_NOUN = re.compile(r"\b[A-ZÀ-ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-ÿ][a-zà-ÿ]+)*\b", re.UNICODE)

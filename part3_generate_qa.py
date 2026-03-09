@@ -1,23 +1,3 @@
-"""
-Part 3: Generate QA Pairs Following TOFU Benchmark Style
-
-This script takes people with facts from Part 2 and generates:
-1. Question-Answer pairs with multiple paraphrases (TOFU style)
-2. Paraphrased answers for evaluation (Truth Ratio metric)
-3. Wrong answers for evaluation
-4. Freeform evaluation prompts
-5. Forget/Retain set splits
-
-Reference: TOFU benchmark (https://locuslab.github.io/tofu/)
-- 20 Q&A pairs per author
-- Questions include full name
-- Answers are detailed and self-contained
-- Paraphrasing for robust evaluation
-
-Input: people_with_facts.jsonl from Part 2
-Output: Full benchmark with QA pairs, splits, and evaluation sets
-"""
-
 import os, re, json, random, time, pathlib
 from typing import Dict, List, Any, Tuple
 from datetime import datetime

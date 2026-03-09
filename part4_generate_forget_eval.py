@@ -1,22 +1,3 @@
-"""
-Part 4: Generate Forget-Eval Data (Truth Ratio + Forget Quality)
-
-This script operates ONLY on the forget set `sf.jsonl` produced by Part 3.
-
-For each QA pair in `sf.jsonl` (one negative_incident per person), it:
-1. Asks the Gemma model to paraphrase the ORIGINAL answer (same fact, different wording)
-2. Asks the Gemma model to generate 5 WRONG answers that:
-   - Keep the same style / template / tone as the original answer
-   - Change the factual content (entities, numbers, locations, organizations, etc.)
-   - Remain plausible and consistent with the question wording
-
-The output is used to compute:
-- Truth Ratio (with paraphrased answers)
-- Forget quality (with wrong answer distractors)
-
-Reference: TOFU benchmark evaluation design.
-"""
-
 import os
 import json
 import time
